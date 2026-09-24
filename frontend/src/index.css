@@ -1,0 +1,99 @@
+:root {
+  --sky: #5BAFD6;
+  --sky-light: #87CEEB;
+  --tint: #EAF6FC;
+  --text: #222831;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #FFFFFF;
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+.page { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
+h1 { font-size: 26px; margin: 0 0 24px; }
+.btn {
+  background: var(--sky);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 24px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn:disabled { background: #B9DCEC; cursor: not-allowed; }
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--sky-light);
+  background: var(--tint);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 16px; /* keeps iOS Safari from auto-zooming on focus */
+  min-height: 44px;
+  color: var(--text);
+}
+.input:focus { outline: 2px solid var(--sky); }
+.error { color: #C0392B; font-size: 14px; margin: 6px 0 0; }
+.card {
+  border: 1px solid var(--sky-light);
+  background: var(--tint);
+  border-radius: 4px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Kyu selection grid: 4 columns desktop, 2-3 tablet, 1 mobile */
+.kyu-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+/* Horizontal scroll container for mark-entry / result tables on narrow screens */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.add-student-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+.add-student-form { flex: 1 1 320px; max-width: 520px; min-width: 0; }
+.add-student-actions { display: flex; flex-direction: column; gap: 12px; }
+
+/* Tablet: 640px-1024px */
+@media (max-width: 1024px) {
+  .kyu-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 768px) {
+  .kyu-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Mobile: below 640px */
+@media (max-width: 640px) {
+  .page { padding: 24px 16px; }
+  h1 { font-size: 21px; }
+  .kyu-grid { grid-template-columns: 1fr; }
+  .add-student-row { flex-direction: column; align-items: stretch; }
+  .add-student-form { max-width: 100%; width: 100%; }
+  .add-student-actions { width: 100%; }
+  .add-student-actions .btn { width: 100%; }
+}

@@ -3,10 +3,20 @@ const path = require('path');
 if (require.main === module) require('./env');
 const pool = require('./db');
 
-const USERS = Array.from({ length: 10 }, (_, i) => ({
-  username: `master${i + 1}`,
-  password: 'karate@2024',
-}));
+const PASSWORD = 'BUDO CLUB';
+
+const USERS = [
+  'Paul Vickraman',
+  'V Sinod',
+  'D Elamuruga Barati',
+  'K Sabariraj',
+  'M Rajeeshkumar',
+  'N Ranjith Kumar',
+  'M Dinesh',
+  'S Manikandan',
+  'master9',
+  'master10',
+].map((username) => ({ username, password: PASSWORD }));
 
 async function migrate() {
   const sql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
@@ -19,6 +29,11 @@ async function migrate() {
       [u.username, u.password]
     );
   }
+
+  // Remove accounts no longer in the list (e.g. the old master1..master8)
+  await pool.query('DELETE FROM users WHERE NOT (username = ANY($1))', [
+    USERS.map((u) => u.username),
+  ]);
 }
 
 module.exports = migrate;

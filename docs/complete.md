@@ -13,7 +13,7 @@ Authentication: Session-based (hardcoded credentials)
 
 User Accounts
 
-There are exactly 10 users. All credentials are hardcoded in the backend. The usernames are master1 through master10, each with the same default password: karate@2024
+There are exactly 10 users. All credentials are hardcoded in the backend. The usernames are Paul Vickraman, V Sinod, D Elamuruga Barati, K Sabariraj, M Rajeeshkumar, N Ranjith Kumar, M Dinesh, S Manikandan, master9 and master10, each with the same password: BUDO CLUB
 
 Authentication Flow
 

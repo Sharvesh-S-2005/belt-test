@@ -29,6 +29,9 @@ export default function Home() {
         <button className="card" style={cardStyle} onClick={() => navigate('/grade')}>
           Grade the Students
         </button>
+        <button className="card" style={cardStyle} onClick={() => navigate('/edit-students')}>
+          Edit the Students
+        </button>
       </div>
     </div>
   )

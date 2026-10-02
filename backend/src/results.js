@@ -17,7 +17,7 @@ router.get('/:kyu', async (req, res, next) => {
 
     // Same order as the mark sheet, so the original S.No matches what the master saw
     const { rows } = await pool.query(
-      `SELECT s.name, m.ex_basics_comb, m.kata, m.others, m.ex_saved, m.kata_saved, m.others_saved
+      `SELECT s.name, s.class, m.ex_basics_comb, m.kata, m.others, m.ex_saved, m.kata_saved, m.others_saved
        FROM students s JOIN marks m ON m.student_id = s.id
        WHERE s.test_grade = $1
        ORDER BY s.age ASC, s.id ASC`,
@@ -31,6 +31,7 @@ router.get('/:kyu', async (req, res, next) => {
     const students = rows.map((r, i) => ({
       original_sno: i + 1,
       name: r.name,
+      branch: r.class ?? '',
       total: r.ex_basics_comb + r.kata + r.others,
       kata: r.kata,
       ex_basics_comb: r.ex_basics_comb,
@@ -48,7 +49,7 @@ router.get('/:kyu', async (req, res, next) => {
     let rank = 0;
     const results = students.map((s, i) => {
       if (i === 0 || s.total !== students[i - 1].total) rank++;
-      return { sno: i + 1, name: s.name, total: s.total, rank, original_sno: s.original_sno };
+      return { sno: i + 1, name: s.name, branch: s.branch, total: s.total, rank, original_sno: s.original_sno };
     });
     res.json(results);
   } catch (err) {

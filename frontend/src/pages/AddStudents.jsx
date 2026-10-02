@@ -95,7 +95,7 @@ export default function AddStudents() {
             'others_marks',
             <input className="input" type="number" inputMode="numeric" min="0" max="20" value={form.others_marks} onChange={set('others_marks')} />
           )}
-          {field('Class', 'class', <input className="input" value={form.class} onChange={set('class')} />)}
+          {field('Branch', 'class', <input className="input" value={form.class} onChange={set('class')} />)}
           {field(
             'Test Grade *',
             'test_grade',

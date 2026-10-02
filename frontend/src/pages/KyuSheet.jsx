@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { downloadTablePdf } from '../pdf.js'
 
 const HEARTBEAT_MS = 5000
 
@@ -116,6 +117,15 @@ export default function KyuSheet() {
     else setResultError(data.error || 'Could not load results')
   }
 
+  const downloadResultPdf = () =>
+    downloadTablePdf({
+      title: `${kyu} - Result`,
+      head: ['S.No', 'Name', 'Branch', 'Total', 'Rank'],
+      body: results.map((r) => [r.sno, r.name, r.branch, r.total, r.rank]),
+      widths: { 0: 14, 3: 22, 4: 20 },
+      filename: `${kyu.replace(' ', '-')}-result.pdf`,
+    })
+
   if (!ready) return null
 
   const th = { border: '1px solid var(--sky-light)', padding: '10px 12px', background: 'var(--sky)', color: '#fff', textAlign: 'left' }
@@ -126,13 +136,16 @@ export default function KyuSheet() {
       <div className="page">
         <div className="page-header">
           <h1>{kyu} - Result</h1>
-          <button className="btn" onClick={() => setResults(null)}>Back to Marks</button>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <button className="btn" onClick={downloadResultPdf}>Download PDF</button>
+            <button className="btn" onClick={() => setResults(null)}>Back to Marks</button>
+          </div>
         </div>
         <div className="table-scroll">
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                {['S.No', 'Name', 'Total', 'Rank'].map((h) => <th key={h} style={th}>{h}</th>)}
+                {['S.No', 'Name', 'Branch', 'Total', 'Rank'].map((h) => <th key={h} style={th}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -140,6 +153,7 @@ export default function KyuSheet() {
                 <tr key={r.sno} style={{ background: i % 2 ? 'var(--tint)' : '#fff' }}>
                   <td style={td}>{r.sno}</td>
                   <td style={td}>{r.name}</td>
+                  <td style={td}>{r.branch}</td>
                   <td style={td}>{r.total}</td>
                   <td style={td}>{r.rank}</td>
                 </tr>

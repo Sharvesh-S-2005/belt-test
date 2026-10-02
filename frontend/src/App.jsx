@@ -7,6 +7,8 @@ import Grade from './pages/Grade.jsx'
 import KyuSheet from './pages/KyuSheet.jsx'
 import EditStudents from './pages/EditStudents.jsx'
 import EditKyuStudents from './pages/EditKyuStudents.jsx'
+import ViewStudents from './pages/ViewStudents.jsx'
+import ViewKyuStudents from './pages/ViewKyuStudents.jsx'
 
 function Protected({ children }) {
   const { user, loading } = useAuth()
@@ -27,6 +29,8 @@ export default function App() {
       <Route path="/grade/:n" element={<Protected><KyuSheet /></Protected>} />
       <Route path="/edit-students" element={<Protected><EditStudents /></Protected>} />
       <Route path="/edit-students/:n" element={<Protected><EditKyuStudents /></Protected>} />
+      <Route path="/view-students" element={<Protected><ViewStudents /></Protected>} />
+      <Route path="/view-students/:n" element={<Protected><ViewKyuStudents /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

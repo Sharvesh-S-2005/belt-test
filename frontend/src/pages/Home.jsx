@@ -32,6 +32,9 @@ export default function Home() {
         <button className="card" style={cardStyle} onClick={() => navigate('/edit-students')}>
           Edit the Students
         </button>
+        <button className="card" style={cardStyle} onClick={() => navigate('/view-students')}>
+          View the Students
+        </button>
       </div>
     </div>
   )

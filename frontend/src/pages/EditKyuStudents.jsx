@@ -155,7 +155,7 @@ export default function EditKyuStudents() {
                 <th style={th}>Name</th>
                 <th style={{ ...th, width: 100 }}>Age</th>
                 <th style={{ ...th, width: 130 }}>Others Marks</th>
-                <th style={th}>Class</th>
+                <th style={th}>Branch</th>
                 <th style={{ ...th, width: 130 }}>Test Grade</th>
                 <th style={{ ...th, width: 200 }}>Actions</th>
               </tr>

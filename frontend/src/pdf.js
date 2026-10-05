@@ -1,6 +1,6 @@
 // Builds a one-table A4 PDF and downloads it. `widths` maps column index -> cell width in mm.
 // jsPDF is loaded on demand so it stays out of the main bundle.
-export async function downloadTablePdf({ title, head, body, filename, widths = {}, minCellHeight }) {
+export async function downloadTablePdf({ title, head, body, filename, widths = {}, minCellHeight = 0 }) {
   const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   doc.setFontSize(16)

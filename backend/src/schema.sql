@@ -37,6 +37,11 @@ CREATE TABLE IF NOT EXISTS marks (
   updated_at TIMESTAMP DEFAULT now()
 );
 
+-- Referee stars (0-3) shown next to each student's name on the mark sheet
+ALTER TABLE marks ADD COLUMN IF NOT EXISTS ref_stars INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE marks DROP CONSTRAINT IF EXISTS marks_ref_stars_check;
+ALTER TABLE marks ADD CONSTRAINT marks_ref_stars_check CHECK (ref_stars BETWEEN 0 AND 3);
+
 CREATE TABLE IF NOT EXISTS kyu_locks (
   id SERIAL PRIMARY KEY,
   kyu VARCHAR(10) UNIQUE NOT NULL,

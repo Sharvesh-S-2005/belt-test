@@ -35,6 +35,7 @@ router.get('/:kyu', async (req, res, next) => {
       total: r.ex_basics_comb + r.kata + r.others,
       kata: r.kata,
       ex_basics_comb: r.ex_basics_comb,
+      others: r.others,
     }));
     // Highest total first; ties broken by Kata, then Ex/Basics/Comb, then original S.No order
     students.sort(
@@ -49,7 +50,17 @@ router.get('/:kyu', async (req, res, next) => {
     let rank = 0;
     const results = students.map((s, i) => {
       if (i === 0 || s.total !== students[i - 1].total) rank++;
-      return { sno: i + 1, name: s.name, branch: s.branch, total: s.total, rank, original_sno: s.original_sno };
+      return {
+        sno: i + 1,
+        name: s.name,
+        branch: s.branch,
+        ex_basics_comb: s.ex_basics_comb,
+        kata: s.kata,
+        others: s.others,
+        total: s.total,
+        rank,
+        original_sno: s.original_sno,
+      };
     });
     res.json(results);
   } catch (err) {

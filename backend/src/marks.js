@@ -36,7 +36,7 @@ router.get('/:kyu', async (req, res, next) => {
 
     const { rows } = await pool.query(
       `SELECT s.id AS student_id, s.name, s.age,
-              m.ex_basics_comb, m.kata, m.others, m.ex_saved, m.kata_saved, m.others_saved
+              m.ex_basics_comb, m.kata, m.others, m.ex_saved, m.kata_saved, m.others_saved, m.ref_stars
        FROM students s JOIN marks m ON m.student_id = s.id
        WHERE s.test_grade = $1
        ORDER BY s.age ASC, s.id ASC`,
@@ -90,6 +90,60 @@ router.post('/save-column', async (req, res, next) => {
     next(err);
   } finally {
     client.release();
+  }
+});
+
+async function studentInKyu(id, kyu) {
+  const { rows } = await pool.query('SELECT 1 FROM students WHERE id = $1 AND test_grade = $2', [id, kyu]);
+  return rows.length > 0;
+}
+
+// Auto-save of a single cell as the master types. Body: { kyu, student_id, column, value }
+// (value null = cleared). The cell is stored as a draft: the column's saved flag is cleared
+// for that student, so the column's Save button must be used again before viewing results.
+router.post('/save-cell', async (req, res, next) => {
+  try {
+    const { kyu, student_id, column, value } = req.body || {};
+    if (!KYUS.includes(kyu)) return res.status(400).json({ error: 'Invalid Kyu' });
+    const col = COLUMNS[column];
+    if (!col) return res.status(400).json({ error: 'Invalid column' });
+    const n = value === null || value === '' ? null : Number(value);
+    if (n !== null && (!Number.isInteger(n) || n < 0 || n > col.max)) {
+      return res.status(400).json({ error: `Marks must be whole numbers from 0 to ${col.max}` });
+    }
+    if (!(await holdsLock(kyu, req.sessionID))) {
+      return res.status(403).json({ error: 'You do not hold the lock for this Kyu' });
+    }
+    if (!(await studentInKyu(student_id, kyu))) return res.status(400).json({ error: 'Invalid student' });
+
+    // column and flag names come from the fixed COLUMNS map above, never from user input
+    await pool.query(
+      `UPDATE marks SET ${column} = $1, ${col.flag} = false, updated_at = now() WHERE student_id = $2`,
+      [n, student_id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Body: { kyu, student_id, stars } — stars 0 to 3, saved immediately
+router.post('/ref', async (req, res, next) => {
+  try {
+    const { kyu, student_id, stars } = req.body || {};
+    if (!KYUS.includes(kyu)) return res.status(400).json({ error: 'Invalid Kyu' });
+    if (!Number.isInteger(stars) || stars < 0 || stars > 3) {
+      return res.status(400).json({ error: 'Stars must be from 0 to 3' });
+    }
+    if (!(await holdsLock(kyu, req.sessionID))) {
+      return res.status(403).json({ error: 'You do not hold the lock for this Kyu' });
+    }
+    if (!(await studentInKyu(student_id, kyu))) return res.status(400).json({ error: 'Invalid student' });
+
+    await pool.query('UPDATE marks SET ref_stars = $1, updated_at = now() WHERE student_id = $2', [stars, student_id]);
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
   }
 });
 

@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { downloadTablePdf } from '../pdf.js'
 
 const HEARTBEAT_MS = 5000
+const AUTOSAVE_MS = 600
+const STARS = [1, 2, 3]
 
 const COLUMNS = [
   { key: 'ex_basics_comb', flag: 'ex_saved', label: 'Ex/Basics/Comb', max: 40 },
@@ -25,6 +27,22 @@ export default function KyuSheet() {
   const [results, setResults] = useState(null) // non-null while the result sheet is shown
   const [resultError, setResultError] = useState('')
   const acquired = useRef(null) // promise of the latest acquire, so release never races ahead of it
+  const timers = useRef({}) // { [cell]: { t, run } } debounced auto-saves not yet sent
+  const chains = useRef({}) // { [cell]: promise } so requests for one cell reach the server in order
+
+  // Queue a request behind any earlier one for the same cell (or the same student's stars)
+  const enqueue = (cell, send) => {
+    const p = (chains.current[cell] || Promise.resolve()).then(send)
+    chains.current[cell] = p
+    return p
+  }
+
+  // Send every pending auto-save now; resolves once all requests in flight have finished
+  const flushAutosave = () => {
+    Object.values(timers.current).forEach(({ t, run }) => { clearTimeout(t); run() })
+    timers.current = {}
+    return Promise.all(Object.values(chains.current))
+  }
 
   useEffect(() => {
     let active = true
@@ -41,8 +59,13 @@ export default function KyuSheet() {
       if (active && res && res.status === 409) navigate('/grade', { replace: true })
     }, HEARTBEAT_MS)
 
-    // Best-effort release when the tab is closed (stale-lock cleanup covers the rest)
-    const onHide = () => fetch(lockUrl, { method: 'DELETE', keepalive: true })
+    // Best-effort release when the tab is closed (stale-lock cleanup covers the rest).
+    // If auto-saves are still going out, keep the lock so they are not rejected.
+    const onHide = () => {
+      const busy = Object.keys(timers.current).length > 0
+      flushAutosave()
+      if (!busy) fetch(lockUrl, { method: 'DELETE', keepalive: true })
+    }
     window.addEventListener('pagehide', onHide)
 
     return () => {
@@ -50,7 +73,7 @@ export default function KyuSheet() {
       clearInterval(hb)
       window.removeEventListener('pagehide', onHide)
       const release = () => fetch(lockUrl, { method: 'DELETE', keepalive: true })
-      acquired.current.then(release, release)
+      Promise.all([acquired.current, flushAutosave()]).then(release, release)
     }
   }, [kyu])
 
@@ -80,6 +103,55 @@ export default function KyuSheet() {
     if (v !== '' && Number(v) > max) return
     setInputs({ ...inputs, [id]: { ...inputs[id], [key]: v } })
     setColMsg({ ...colMsg, [key]: undefined })
+    scheduleAutosave(id, COLUMNS.find((c) => c.key === key), v)
+  }
+
+  // Each entry is saved on its own shortly after typing stops. It is stored as a draft:
+  // the column still needs its Save button before results can be viewed.
+  const scheduleAutosave = (id, c, v) => {
+    const cell = `${id}:${c.key}`
+    clearTimeout(timers.current[cell]?.t)
+    const run = () => {
+      delete timers.current[cell]
+      enqueue(cell, async () => {
+        const value = v === '' ? null : Number(v)
+        try {
+          const res = await fetch('/api/marks/save-cell', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kyu, student_id: id, column: c.key, value }),
+            keepalive: true,
+          })
+          if (!res.ok) throw new Error()
+          setRows((rs) => rs.map((r) => (r.student_id === id ? { ...r, [c.key]: value, [c.flag]: false } : r)))
+        } catch {
+          setColMsg((m) => ({ ...m, [c.key]: { text: 'Auto-save failed. Click Save to retry.', ok: false } }))
+        }
+      })
+    }
+    timers.current[cell] = { t: setTimeout(run, AUTOSAVE_MS), run }
+  }
+
+  // Stars are lit in order 1 -> 3 and turned off in order 3 -> 1:
+  // only the next unlit star or the last lit star responds to a click.
+  const clickStar = (r, k) => {
+    const prev = r.ref_stars
+    const next = k === prev + 1 ? k : k === prev ? k - 1 : null
+    if (next === null) return
+    const id = r.student_id
+    setRows((rs) => rs.map((x) => (x.student_id === id ? { ...x, ref_stars: next } : x)))
+    enqueue(`${id}:ref`, async () => {
+      const res = await fetch('/api/marks/ref', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kyu, student_id: id, stars: next }),
+        keepalive: true,
+      }).catch(() => null)
+      if (res && res.ok) return
+      // Undo this click unless a later click has already changed it
+      setRows((rs) => rs.map((x) => (x.student_id === id && x.ref_stars === next ? { ...x, ref_stars: prev } : x)))
+      setColMsg((m) => ({ ...m, ref: { text: 'Could not save stars', ok: false } }))
+    })
   }
 
   const saveColumn = async (c) => {
@@ -89,6 +161,8 @@ export default function KyuSheet() {
     }
     setSaving(c.key)
     try {
+      // Let pending auto-saves land first so they can't clear the saved flag afterwards
+      await flushAutosave()
       const res = await fetch('/api/marks/save-column', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -100,10 +174,10 @@ export default function KyuSheet() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Save failed')
-      setRows(rows.map((r) => ({ ...r, [c.key]: Number(inputs[r.student_id][c.key]), [c.flag]: true })))
-      setColMsg({ ...colMsg, [c.key]: { text: 'Saved', ok: true } })
+      setRows((rs) => rs.map((r) => ({ ...r, [c.key]: Number(inputs[r.student_id][c.key]), [c.flag]: true })))
+      setColMsg((m) => ({ ...m, [c.key]: { text: 'Saved', ok: true } }))
     } catch (err) {
-      setColMsg({ ...colMsg, [c.key]: { text: err.message, ok: false } })
+      setColMsg((m) => ({ ...m, [c.key]: { text: err.message, ok: false } }))
     } finally {
       setSaving('')
     }
@@ -120,9 +194,9 @@ export default function KyuSheet() {
   const downloadResultPdf = () =>
     downloadTablePdf({
       title: `${kyu} - Result`,
-      head: ['S.No', 'Name', 'Branch', 'Total', 'Rank'],
-      body: results.map((r) => [r.sno, r.name, r.branch, r.total, r.rank]),
-      widths: { 0: 14, 3: 22, 4: 20 },
+      head: ['S.No', 'Name', 'Branch', 'Ex/Basics/\nComb', 'Kata', 'Others', 'Total', 'Rank'],
+      body: results.map((r) => [r.sno, r.name, r.branch, r.ex_basics_comb, r.kata, r.others, r.total, r.rank]),
+      widths: { 0: 16, 3: 27, 4: 16, 5: 20, 6: 17, 7: 17 },
       filename: `${kyu.replace(' ', '-')}-result.pdf`,
     })
 
@@ -184,6 +258,7 @@ export default function KyuSheet() {
               <tr>
                 <th style={{ ...th, width: 80 }}>S.No</th>
                 <th style={th}>Name</th>
+                <th style={{ ...th, width: 120 }}>Ref</th>
                 {COLUMNS.map((c) => (
                   <th key={c.key} style={{ ...th, width: 190 }}>{c.label} <span style={{ fontWeight: 400 }}>(max {c.max})</span></th>
                 ))}
@@ -195,6 +270,32 @@ export default function KyuSheet() {
                 <tr key={r.student_id} style={{ background: i % 2 ? 'var(--tint)' : '#fff' }}>
                   <td style={td}>{i + 1}</td>
                   <td style={td}>{r.name}</td>
+                  <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                    {STARS.map((k) => {
+                      const lit = k <= r.ref_stars
+                      const clickable = k === r.ref_stars + 1 || k === r.ref_stars
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          aria-label={`Star ${k}${lit ? ' (on)' : ''}`}
+                          aria-pressed={lit}
+                          onClick={() => clickStar(r, k)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: '0 2px',
+                            fontSize: 24,
+                            lineHeight: 1,
+                            color: lit ? '#FFC107' : '#C8D3DA',
+                            cursor: clickable ? 'pointer' : 'default',
+                          }}
+                        >
+                          ★
+                        </button>
+                      )
+                    })}
+                  </td>
                   {COLUMNS.map((c) => (
                     <td key={c.key} style={td}>
                       <input
@@ -213,13 +314,16 @@ export default function KyuSheet() {
             <tfoot>
               <tr>
                 <td style={td} colSpan={2}></td>
+                <td style={{ ...td, verticalAlign: 'top' }}>
+                  {colMsg.ref && <p className="error" style={{ marginTop: 2 }}>{colMsg.ref.text}</p>}
+                </td>
                 {COLUMNS.map((c) => (
                   <td key={c.key} style={{ ...td, verticalAlign: 'top' }}>
                     <button className="btn" style={{ width: '100%' }} disabled={saving === c.key} onClick={() => saveColumn(c)}>
                       Save
                     </button>
                     <div style={{ fontSize: 13, marginTop: 6, color: columnSaved(c) ? '#2E7D32' : '#8A6D00' }}>
-                      {columnSaved(c) ? 'Saved' : 'Not saved'}
+                      {columnSaved(c) ? 'Saved' : 'Click Save to confirm'}
                     </div>
                     {colMsg[c.key] && !colMsg[c.key].ok && <p className="error" style={{ marginTop: 2 }}>{colMsg[c.key].text}</p>}
                   </td>
